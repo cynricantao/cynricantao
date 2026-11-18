@@ -1,4 +1,4 @@
-name: Generate Snake
+name: Profile assets (stats + snake)
 
 on:
   schedule:
@@ -10,11 +10,33 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: profile-assets
+  cancel-in-progress: true
+
 jobs:
   generate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install renderer deps
+        run: |
+          pip install --quiet fonttools pyfiglet
+          curl -sSL -o jbm.zip https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip
+          unzip -q -j jbm.zip 'fonts/ttf/JetBrainsMono-Regular.ttf' 'fonts/ttf/JetBrainsMono-Bold.ttf' 'fonts/ttf/JetBrainsMono-ExtraBold.ttf' -d fonts
+
+      - name: Render stats + activity panels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JBM_DIR: fonts
+        run: python tools/stats_svgs.py ${{ github.repository_owner }} dist
+
       - name: Generate snake SVGs (Tokyo Night)
         uses: Platane/snk@v3
         with:
@@ -23,7 +45,7 @@ jobs:
             dist/github-snake.svg?color_snake=#9854f1&color_dots=#ebedf0,#b4c8f5,#7aa2f7,#2e7de9,#9854f1
             dist/github-snake-dark.svg?palette=github-dark&color_snake=#7dcfff&color_dots=#1f2335,#2e3c64,#3d59a1,#7aa2f7,#bb9af7
 
-      - name: Push SVGs to the output branch
+      - name: Push generated SVGs to the output branch
         uses: crazy-max/ghaction-github-pages@v4
         with:
           target_branch: output
